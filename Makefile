@@ -1,4 +1,4 @@
-.PHONY: up down db-logs db-shell migrate-up migrate-down migrate-version build run test fmt clean
+.PHONY: up down db-logs db-shell migrate-up migrate-down migrate-version sqlc-generate build run test fmt clean
 
 # Load .env if present
 ifneq (,$(wildcard ./.env))
@@ -36,6 +36,10 @@ migrate-down:
 # Print current database migration version
 migrate-version:
 	go run ./cmd/migrate -version
+
+# Generate type-safe SQL code with sqlc
+sqlc-generate:
+	sqlc generate
 
 # Build Go API binary
 build:
