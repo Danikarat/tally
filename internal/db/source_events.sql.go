@@ -85,6 +85,7 @@ INSERT INTO source_events (
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9
 )
+ON CONFLICT (user_id, payload_hash) DO NOTHING
 RETURNING id, user_id, source_type, provider, sender_identifier, external_reference, payload_hash, raw_payload, parse_status, received_at, created_at
 `
 

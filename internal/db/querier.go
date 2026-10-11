@@ -16,6 +16,7 @@ type Querier interface {
 	FindAccountByProviderAndMaskedIdentifier(ctx context.Context, arg FindAccountByProviderAndMaskedIdentifierParams) (FinancialAccount, error)
 	FindSourceEventByHash(ctx context.Context, arg FindSourceEventByHashParams) (SourceEvent, error)
 	FindTransactionByReference(ctx context.Context, arg FindTransactionByReferenceParams) (Transaction, error)
+	FindTransactionBySourceEventID(ctx context.Context, arg FindTransactionBySourceEventIDParams) (Transaction, error)
 	GetDefaultFinancialAccount(ctx context.Context, userID pgtype.UUID) (FinancialAccount, error)
 	GetFinancialAccountByID(ctx context.Context, arg GetFinancialAccountByIDParams) (FinancialAccount, error)
 	GetSourceEventByID(ctx context.Context, arg GetSourceEventByIDParams) (SourceEvent, error)

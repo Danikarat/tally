@@ -79,15 +79,13 @@ func (s *Service) processCandidate(ctx context.Context, q *db.Queries, userUUID 
 	if err == nil {
 		srcIDStr := uuidToString(existingEvent.ID)
 		var txIDStr *string
-		if c.ProviderReference != nil && *c.ProviderReference != "" {
-			existingTx, txErr := q.FindTransactionByReference(ctx, db.FindTransactionByReferenceParams{
-				UserID:            userUUID,
-				ProviderReference: db.Text(*c.ProviderReference),
-			})
-			if txErr == nil {
-				tid := uuidToString(existingTx.ID)
-				txIDStr = &tid
-			}
+		existingTx, txErr := q.FindTransactionBySourceEventID(ctx, db.FindTransactionBySourceEventIDParams{
+			UserID:        userUUID,
+			SourceEventID: existingEvent.ID,
+		})
+		if txErr == nil {
+			tid := uuidToString(existingTx.ID)
+			txIDStr = &tid
 		}
 
 		return IngestItemResult{
@@ -116,7 +114,7 @@ func (s *Service) processCandidate(ctx context.Context, q *db.Queries, userUUID 
 		}
 	}
 
-	// 3. Insert Source Event
+	// 3. Insert Source Event (with ON CONFLICT DO NOTHING)
 	receivedAt := c.EventTimestamp
 	if receivedAt.IsZero() {
 		receivedAt = time.Now().UTC()
@@ -134,8 +132,34 @@ func (s *Service) processCandidate(ctx context.Context, q *db.Queries, userUUID 
 		ReceivedAt:        db.Timestamptz(receivedAt),
 	})
 	if err != nil {
+		// If ON CONFLICT DO NOTHING returned no rows, it's a conflict
+		if errors.Is(err, pgx.ErrNoRows) {
+			existingEvt, fErr := q.FindSourceEventByHash(ctx, db.FindSourceEventByHashParams{
+				UserID:      userUUID,
+				PayloadHash: payloadHash,
+			})
+			if fErr == nil {
+				srcIDStr := uuidToString(existingEvt.ID)
+				var txIDStr *string
+				existingTx, txErr := q.FindTransactionBySourceEventID(ctx, db.FindTransactionBySourceEventIDParams{
+					UserID:        userUUID,
+					SourceEventID: existingEvt.ID,
+				})
+				if txErr == nil {
+					tid := uuidToString(existingTx.ID)
+					txIDStr = &tid
+				}
+				return IngestItemResult{
+					Index:         idx,
+					Status:        StatusDuplicateIgnored,
+					TransactionID: txIDStr,
+					SourceEventID: &srcIDStr,
+				}
+			}
+		}
+
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation fallback
 			srcIDStr := ""
 			return IngestItemResult{
 				Index:         idx,
@@ -143,6 +167,7 @@ func (s *Service) processCandidate(ctx context.Context, q *db.Queries, userUUID 
 				SourceEventID: &srcIDStr,
 			}
 		}
+
 		errStr := fmt.Sprintf("failed inserting source event: %v", err)
 		return IngestItemResult{
 			Index:  idx,

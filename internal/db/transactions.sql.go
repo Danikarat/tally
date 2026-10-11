@@ -48,6 +48,44 @@ func (q *Queries) FindTransactionByReference(ctx context.Context, arg FindTransa
 	return i, err
 }
 
+const findTransactionBySourceEventID = `-- name: FindTransactionBySourceEventID :one
+SELECT id, user_id, account_id, source_event_id, amount_minor_units, currency, direction, transaction_type, counterparty, counterparty_identifier, provider_reference, status, user_category_id, user_notes, user_modified, event_timestamp, created_at, updated_at
+FROM transactions
+WHERE user_id = $1 AND source_event_id = $2
+LIMIT 1
+`
+
+type FindTransactionBySourceEventIDParams struct {
+	UserID        pgtype.UUID `json:"user_id"`
+	SourceEventID pgtype.UUID `json:"source_event_id"`
+}
+
+func (q *Queries) FindTransactionBySourceEventID(ctx context.Context, arg FindTransactionBySourceEventIDParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, findTransactionBySourceEventID, arg.UserID, arg.SourceEventID)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.AccountID,
+		&i.SourceEventID,
+		&i.AmountMinorUnits,
+		&i.Currency,
+		&i.Direction,
+		&i.TransactionType,
+		&i.Counterparty,
+		&i.CounterpartyIdentifier,
+		&i.ProviderReference,
+		&i.Status,
+		&i.UserCategoryID,
+		&i.UserNotes,
+		&i.UserModified,
+		&i.EventTimestamp,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getTransactionByID = `-- name: GetTransactionByID :one
 SELECT id, user_id, account_id, source_event_id, amount_minor_units, currency, direction, transaction_type, counterparty, counterparty_identifier, provider_reference, status, user_category_id, user_notes, user_modified, event_timestamp, created_at, updated_at
 FROM transactions

@@ -25,6 +25,12 @@ SELECT id, user_id, account_id, source_event_id, amount_minor_units, currency, d
 FROM transactions
 WHERE user_id = $1 AND provider_reference = $2;
 
+-- name: FindTransactionBySourceEventID :one
+SELECT id, user_id, account_id, source_event_id, amount_minor_units, currency, direction, transaction_type, counterparty, counterparty_identifier, provider_reference, status, user_category_id, user_notes, user_modified, event_timestamp, created_at, updated_at
+FROM transactions
+WHERE user_id = $1 AND source_event_id = $2
+LIMIT 1;
+
 -- name: GetTransactionByID :one
 SELECT id, user_id, account_id, source_event_id, amount_minor_units, currency, direction, transaction_type, counterparty, counterparty_identifier, provider_reference, status, user_category_id, user_notes, user_modified, event_timestamp, created_at, updated_at
 FROM transactions
