@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Danikarat/tally/internal/auth"
 	"github.com/Danikarat/tally/internal/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Server represents the HTTP application server.
@@ -18,15 +20,17 @@ type Server struct {
 	cfg        *config.Config
 	logger     *slog.Logger
 	router     *chi.Mux
+	db         *pgxpool.Pool
 	httpServer *http.Server
 }
 
 // New creates and configures a new Server instance.
-func New(cfg *config.Config, logger *slog.Logger) *Server {
+func New(cfg *config.Config, logger *slog.Logger, db *pgxpool.Pool) *Server {
 	s := &Server{
 		cfg:    cfg,
 		logger: logger,
 		router: chi.NewRouter(),
+		db:     db,
 	}
 
 	s.setupMiddleware()
@@ -78,6 +82,12 @@ func (s *Server) slogMiddleware() func(next http.Handler) http.Handler {
 // setupRoutes registers application endpoints.
 func (s *Server) setupRoutes() {
 	s.router.Get("/healthz", s.handleHealthCheck)
+
+	if s.db != nil {
+		authService := auth.NewService(s.db, s.cfg.Auth)
+		authHandler := auth.NewHandler(authService)
+		authHandler.RegisterRoutes(s.router)
+	}
 }
 
 // handleHealthCheck returns 200 OK with server status.

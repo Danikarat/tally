@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -14,37 +15,51 @@ func TestMigrations_LifecycleAndConstraints(t *testing.T) {
 		t.Fatalf("failed to load test config: %v", err)
 	}
 
-	dsn := cfg.DB.DSN()
-
-	// Ensure database connection can be established
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	pool, err := NewPool(ctx, dsn)
+	adminPool, err := NewPool(ctx, cfg.DB.DSN())
 	if err != nil {
-		t.Skipf("skipping test: database not reachable at %s (%v)", dsn, err)
+		t.Skipf("skipping test: database not reachable at %s (%v)", cfg.DB.DSN(), err)
 		return
 	}
-	defer pool.Close()
+	defer adminPool.Close()
 
-	// 1. Rollback any existing migrations to start clean
-	_ = MigrateDown(dsn)
-
-	// Verify version is 0 after rollback
-	ver, dirty, err := MigrateVersion(dsn)
+	testDBName := "tally_test_migration_lifecycle"
+	_, _ = adminPool.Exec(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", testDBName))
+	_, err = adminPool.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s", testDBName))
 	if err != nil {
-		t.Fatalf("unexpected error checking version after rollback: %v", err)
+		t.Fatalf("failed to create isolated test database: %v", err)
+	}
+	defer func() {
+		_, _ = adminPool.Exec(context.Background(), fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", testDBName))
+	}()
+
+	testCfg := *cfg
+	testCfg.DB.Name = testDBName
+	testDSN := testCfg.DB.DSN()
+
+	testPool, err := NewPool(ctx, testDSN)
+	if err != nil {
+		t.Fatalf("failed to connect to isolated test database: %v", err)
+	}
+	defer testPool.Close()
+
+	// 1. Check initial version is 0
+	ver, dirty, err := MigrateVersion(testDSN)
+	if err != nil {
+		t.Fatalf("unexpected error checking version on fresh database: %v", err)
 	}
 	if ver != 0 || dirty {
 		t.Fatalf("expected version 0 and clean, got version %d, dirty=%v", ver, dirty)
 	}
 
 	// 2. Apply migrations Up
-	if err := MigrateUp(dsn); err != nil {
+	if err := MigrateUp(testDSN); err != nil {
 		t.Fatalf("failed to migrate up: %v", err)
 	}
 
-	ver, dirty, err = MigrateVersion(dsn)
+	ver, dirty, err = MigrateVersion(testDSN)
 	if err != nil {
 		t.Fatalf("failed to get version: %v", err)
 	}
@@ -54,7 +69,7 @@ func TestMigrations_LifecycleAndConstraints(t *testing.T) {
 
 	// 3. Test Inserting a valid user
 	var userID string
-	err = pool.QueryRow(ctx, `
+	err = testPool.QueryRow(ctx, `
 		INSERT INTO users (email, password_hash, full_name)
 		VALUES ($1, $2, $3)
 		RETURNING id
@@ -65,7 +80,7 @@ func TestMigrations_LifecycleAndConstraints(t *testing.T) {
 
 	// 4. Test Inserting a valid financial account
 	var accountID string
-	err = pool.QueryRow(ctx, `
+	err = testPool.QueryRow(ctx, `
 		INSERT INTO financial_accounts (user_id, account_type, provider_name, account_identifier_masked, currency, balance_minor_units)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id
@@ -75,7 +90,7 @@ func TestMigrations_LifecycleAndConstraints(t *testing.T) {
 	}
 
 	// 5. Constraint Test: Invalid account_type (not in MOMO, BANK, CASH, OTHER)
-	_, err = pool.Exec(ctx, `
+	_, err = testPool.Exec(ctx, `
 		INSERT INTO financial_accounts (user_id, account_type, provider_name, currency)
 		VALUES ($1, $2, $3, $4)
 	`, userID, "INVALID_TYPE", "Crypto", "GHS")
@@ -84,7 +99,7 @@ func TestMigrations_LifecycleAndConstraints(t *testing.T) {
 	}
 
 	// 6. Constraint Test: Invalid currency length (must be 3 chars)
-	_, err = pool.Exec(ctx, `
+	_, err = testPool.Exec(ctx, `
 		INSERT INTO financial_accounts (user_id, account_type, provider_name, currency)
 		VALUES ($1, $2, $3, $4)
 	`, userID, "BANK", "Stanbic", "TOOLONG")
@@ -93,7 +108,7 @@ func TestMigrations_LifecycleAndConstraints(t *testing.T) {
 	}
 
 	// 7. Constraint Test: Non-existent user_id (foreign key violation)
-	_, err = pool.Exec(ctx, `
+	_, err = testPool.Exec(ctx, `
 		INSERT INTO financial_accounts (user_id, account_type, provider_name, currency)
 		VALUES ('00000000-0000-0000-0000-000000000000', 'MOMO', 'MTN MoMo', 'GHS')
 	`)
@@ -102,12 +117,15 @@ func TestMigrations_LifecycleAndConstraints(t *testing.T) {
 	}
 
 	// 8. Rollback Down to verify teardown
-	if err := MigrateDown(dsn); err != nil {
+	if err := MigrateDown(testDSN); err != nil {
 		t.Fatalf("failed to migrate down: %v", err)
 	}
 
-	// 9. Re-apply Up so dev database remains ready for subsequent use
-	if err := MigrateUp(dsn); err != nil {
-		t.Fatalf("failed to re-apply migrations up: %v", err)
+	ver, _, err = MigrateVersion(testDSN)
+	if err != nil {
+		t.Fatalf("unexpected error checking version after rollback: %v", err)
+	}
+	if ver != 0 {
+		t.Fatalf("expected version 0 after rollback, got %d", ver)
 	}
 }

@@ -17,7 +17,7 @@ func TestServer_HealthCheck(t *testing.T) {
 		Port:        8080,
 	}
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	srv := New(cfg, logger)
+	srv := New(cfg, logger, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()
@@ -52,7 +52,7 @@ func TestServer_NotFound(t *testing.T) {
 		Port:        8080,
 	}
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	srv := New(cfg, logger)
+	srv := New(cfg, logger, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/unknown-endpoint", nil)
 	rec := httptest.NewRecorder()

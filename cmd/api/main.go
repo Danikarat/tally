@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Danikarat/tally/internal/config"
+	"github.com/Danikarat/tally/internal/database"
 	"github.com/Danikarat/tally/internal/server"
 )
 
@@ -28,7 +29,6 @@ func run() error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Setup structured logger based on environment
 	var logHandler slog.Handler
 	if cfg.Environment == "development" {
 		logHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
@@ -43,11 +43,23 @@ func run() error {
 		"port", cfg.Port,
 	)
 
-	srv := server.New(cfg, logger)
-
 	// Context for graceful shutdown on SIGINT or SIGTERM
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Connect to database pool
+	dbPool, err := database.NewPool(ctx, cfg.DB.DSN())
+	if err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+	defer dbPool.Close()
+
+	// Apply database migrations on boot
+	if err := database.MigrateUp(cfg.DB.DSN()); err != nil {
+		return fmt.Errorf("failed to run database migrations: %w", err)
+	}
+
+	srv := server.New(cfg, logger, dbPool)
 
 	serverErrors := make(chan error, 1)
 	go func() {
