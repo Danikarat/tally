@@ -85,7 +85,7 @@ func (s *Server) setupRoutes() {
 
 	if s.db != nil {
 		authService := auth.NewService(s.db, s.cfg.Auth)
-		authHandler := auth.NewHandler(authService)
+		authHandler := auth.NewHandler(authService, s.cfg.Auth.JWTSecret)
 		authHandler.RegisterRoutes(s.router)
 	}
 }

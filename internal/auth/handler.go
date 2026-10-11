@@ -10,12 +10,16 @@ import (
 
 // Handler handles HTTP requests for authentication.
 type Handler struct {
-	service *Service
+	service   *Service
+	jwtSecret string
 }
 
 // NewHandler returns a new authentication handler.
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service *Service, jwtSecret string) *Handler {
+	return &Handler{
+		service:   service,
+		jwtSecret: jwtSecret,
+	}
 }
 
 // RegisterRoutes mounts authentication endpoints on a Chi router.
@@ -23,6 +27,12 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Route("/v1/auth", func(r chi.Router) {
 		r.Post("/register", h.handleRegister)
 		r.Post("/login", h.handleLogin)
+
+		// Authenticated endpoints
+		r.Group(func(r chi.Router) {
+			r.Use(RequireAuth(h.jwtSecret))
+			r.Get("/me", h.handleGetMe)
+		})
 	})
 }
 
@@ -71,6 +81,22 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) handleGetMe(w http.ResponseWriter, r *http.Request) {
+	userID, ok := UserIDFromContext(r.Context())
+	if !ok {
+		h.writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	user, err := h.service.GetUserByID(r.Context(), userID)
+	if err != nil {
+		h.writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]any{"user": user})
 }
 
 func (h *Handler) writeJSON(w http.ResponseWriter, status int, data any) {

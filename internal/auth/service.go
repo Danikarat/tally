@@ -17,6 +17,7 @@ var (
 	ErrEmailTaken         = errors.New("email address is already registered")
 	ErrInvalidCredentials = errors.New("invalid email or password")
 	ErrAccountInactive    = errors.New("account has been disabled")
+	ErrUserNotFound       = errors.New("user not found")
 )
 
 // User represents the public user model (excludes password hash).
@@ -166,4 +167,31 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*AuthResponse, e
 		Token:     token,
 		ExpiresAt: expiresAt,
 	}, nil
+}
+
+// GetUserByID retrieves a user record by their unique ID.
+func (s *Service) GetUserByID(ctx context.Context, id string) (*User, error) {
+	var user User
+	query := `
+		SELECT id, email, full_name, is_active, created_at
+		FROM users
+		WHERE id = $1
+	`
+
+	err := s.db.QueryRow(ctx, query, id).Scan(
+		&user.ID,
+		&user.Email,
+		&user.FullName,
+		&user.IsActive,
+		&user.CreatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrUserNotFound
+		}
+		return nil, fmt.Errorf("failed to query user by id: %w", err)
+	}
+
+	return &user, nil
 }

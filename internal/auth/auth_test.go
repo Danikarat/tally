@@ -14,7 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func setupTestServer(t *testing.T) (*httptest.Server, *Service) {
+func setupTestServer(t *testing.T) (*httptest.Server, *Service, *config.Config) {
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -26,7 +26,7 @@ func setupTestServer(t *testing.T) (*httptest.Server, *Service) {
 	pool, err := database.NewPool(ctx, cfg.DB.DSN())
 	if err != nil {
 		t.Skipf("skipping test: database not reachable at %s (%v)", cfg.DB.DSN(), err)
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// Ensure tables are migrated
@@ -38,17 +38,17 @@ func setupTestServer(t *testing.T) (*httptest.Server, *Service) {
 	_, _ = pool.Exec(ctx, "DELETE FROM users")
 
 	authService := NewService(pool, cfg.Auth)
-	handler := NewHandler(authService)
+	handler := NewHandler(authService, cfg.Auth.JWTSecret)
 
 	router := chi.NewRouter()
 	handler.RegisterRoutes(router)
 
 	ts := httptest.NewServer(router)
-	return ts, authService
+	return ts, authService, cfg
 }
 
 func TestAuth_RegisterAndLogin_Lifecycle(t *testing.T) {
-	ts, _ := setupTestServer(t)
+	ts, _, _ := setupTestServer(t)
 	if ts == nil {
 		return
 	}
@@ -151,7 +151,32 @@ func TestAuth_RegisterAndLogin_Lifecycle(t *testing.T) {
 		t.Error("expected non-empty auth token on login")
 	}
 
-	// 6. Login with Wrong Password -> 401 Unauthorized
+	// 6. Access protected GET /v1/auth/me with valid token -> 200 OK
+	reqMe, _ := http.NewRequest(http.MethodGet, ts.URL+"/v1/auth/me", nil)
+	reqMe.Header.Set("Authorization", "Bearer "+loginResponse.Token)
+	respMe, err := client.Do(reqMe)
+	if err != nil {
+		t.Fatalf("failed to call /v1/auth/me: %v", err)
+	}
+	defer respMe.Body.Close()
+
+	if respMe.StatusCode != http.StatusOK {
+		t.Errorf("expected 200 OK on /v1/auth/me with valid token, got %d", respMe.StatusCode)
+	}
+
+	// 7. Access protected GET /v1/auth/me without token -> 401 Unauthorized
+	reqNoAuth, _ := http.NewRequest(http.MethodGet, ts.URL+"/v1/auth/me", nil)
+	respNoAuth, err := client.Do(reqNoAuth)
+	if err != nil {
+		t.Fatalf("failed to call /v1/auth/me without token: %v", err)
+	}
+	defer respNoAuth.Body.Close()
+
+	if respNoAuth.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401 Unauthorized on /v1/auth/me without token, got %d", respNoAuth.StatusCode)
+	}
+
+	// 8. Login with Wrong Password -> 401 Unauthorized
 	wrongPassBody, _ := json.Marshal(map[string]string{
 		"email":    "kwame.mensah@example.com",
 		"password": "WrongPassword123!",
@@ -163,7 +188,7 @@ func TestAuth_RegisterAndLogin_Lifecycle(t *testing.T) {
 		t.Errorf("expected 401 Unauthorized for wrong password, got %d", respWrongPass.StatusCode)
 	}
 
-	// 7. Login with Non-Existent Email -> 401 Unauthorized
+	// 9. Login with Non-Existent Email -> 401 Unauthorized
 	nonExistentBody, _ := json.Marshal(map[string]string{
 		"email":    "nobody@example.com",
 		"password": "StrongP@ssw0rd1",
