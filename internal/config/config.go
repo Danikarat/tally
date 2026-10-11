@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"strconv"
 	"time"
@@ -43,11 +42,24 @@ type AuthConfig struct {
 	TokenDuration time.Duration
 }
 
+// LoadOptions configures configuration loading behavior.
+type LoadOptions struct {
+	IgnoreDotEnv bool
+}
+
 // Load reads configuration from environment variables and an optional .env file.
 func Load() (*Config, error) {
-	// Attempt to load .env file if it exists, but don't fail if it doesn't
-	if err := godotenv.Load(); err != nil && !os.IsNotExist(err) {
-		slog.Debug("No .env file found or error reading, using environment variables", "error", err)
+	return LoadWithOptions(LoadOptions{})
+}
+
+// LoadWithOptions reads configuration with customizable options.
+func LoadWithOptions(opts LoadOptions) (*Config, error) {
+	if !opts.IgnoreDotEnv {
+		for _, path := range []string{".env", "../.env", "../../.env"} {
+			if err := godotenv.Load(path); err == nil {
+				break
+			}
+		}
 	}
 
 	cfg := &Config{

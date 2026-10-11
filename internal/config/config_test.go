@@ -14,7 +14,7 @@ func TestConfig_Defaults(t *testing.T) {
 	os.Unsetenv("DB_PORT")
 	os.Unsetenv("JWT_SECRET")
 
-	cfg, err := Load()
+	cfg, err := LoadWithOptions(LoadOptions{IgnoreDotEnv: true})
 	if err != nil {
 		t.Fatalf("expected no error loading defaults, got %v", err)
 	}

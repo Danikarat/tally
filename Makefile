@@ -1,4 +1,4 @@
-.PHONY: up down db-logs db-shell build run test fmt clean
+.PHONY: up down db-logs db-shell migrate-up migrate-down migrate-version build run test fmt clean
 
 # Load .env if present
 ifneq (,$(wildcard ./.env))
@@ -24,6 +24,18 @@ db-logs:
 # Open interactive psql shell inside PostgreSQL container
 db-shell:
 	docker compose exec -it postgres psql -U $(or $(DB_USER),tally) -d $(or $(DB_NAME),tally_dev)
+
+# Apply all pending database migrations
+migrate-up:
+	go run ./cmd/migrate -up
+
+# Rollback all database migrations
+migrate-down:
+	go run ./cmd/migrate -down
+
+# Print current database migration version
+migrate-version:
+	go run ./cmd/migrate -version
 
 # Build Go API binary
 build:
