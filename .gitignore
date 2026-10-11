@@ -1,1 +1,24 @@
+# Environment files
 .env
+.env.local
+
+# Binaries and build artifacts
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts and coverage
+*.test
+*.out
+coverage.html
+
+# IDE and OS files
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
