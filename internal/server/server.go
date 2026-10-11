@@ -11,6 +11,7 @@ import (
 	"github.com/Danikarat/tally/internal/auth"
 	"github.com/Danikarat/tally/internal/config"
 	"github.com/Danikarat/tally/internal/ingestion"
+	"github.com/Danikarat/tally/internal/transactions"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -92,6 +93,10 @@ func (s *Server) setupRoutes() {
 		ingestionService := ingestion.NewService(s.db)
 		ingestionHandler := ingestion.NewHandler(ingestionService, s.cfg.Auth.JWTSecret)
 		ingestionHandler.RegisterRoutes(s.router)
+
+		txService := transactions.NewService(s.db)
+		txHandler := transactions.NewHandler(txService, s.cfg.Auth.JWTSecret)
+		txHandler.RegisterRoutes(s.router)
 	}
 }
 

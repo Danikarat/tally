@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	CountTransactionsFiltered(ctx context.Context, arg CountTransactionsFilteredParams) (int64, error)
 	CreateFinancialAccount(ctx context.Context, arg CreateFinancialAccountParams) (FinancialAccount, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	FindAccountByProviderAndMaskedIdentifier(ctx context.Context, arg FindAccountByProviderAndMaskedIdentifierParams) (FinancialAccount, error)
@@ -29,9 +30,11 @@ type Querier interface {
 	ListSourceEventsByUser(ctx context.Context, arg ListSourceEventsByUserParams) ([]SourceEvent, error)
 	ListTransactionsByAccount(ctx context.Context, arg ListTransactionsByAccountParams) ([]Transaction, error)
 	ListTransactionsByUser(ctx context.Context, arg ListTransactionsByUserParams) ([]Transaction, error)
+	ListTransactionsFiltered(ctx context.Context, arg ListTransactionsFilteredParams) ([]Transaction, error)
 	UpdateAccountBalance(ctx context.Context, arg UpdateAccountBalanceParams) (FinancialAccount, error)
 	UpdateSourceEventStatus(ctx context.Context, arg UpdateSourceEventStatusParams) (SourceEvent, error)
 	UpdateTransactionStatus(ctx context.Context, arg UpdateTransactionStatusParams) (Transaction, error)
+	UpdateTransactionUserFields(ctx context.Context, arg UpdateTransactionUserFieldsParams) (Transaction, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 }
 

@@ -11,6 +11,37 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countTransactionsFiltered = `-- name: CountTransactionsFiltered :one
+SELECT count(*)
+FROM transactions
+WHERE user_id = $1
+  AND ($2::uuid IS NULL OR account_id = $2)
+  AND ($3::timestamptz IS NULL OR event_timestamp >= $3)
+  AND ($4::timestamptz IS NULL OR event_timestamp <= $4)
+  AND ($5::varchar IS NULL OR transaction_type = $5)
+`
+
+type CountTransactionsFilteredParams struct {
+	UserID          pgtype.UUID        `json:"user_id"`
+	AccountID       pgtype.UUID        `json:"account_id"`
+	FromDate        pgtype.Timestamptz `json:"from_date"`
+	ToDate          pgtype.Timestamptz `json:"to_date"`
+	TransactionType pgtype.Text        `json:"transaction_type"`
+}
+
+func (q *Queries) CountTransactionsFiltered(ctx context.Context, arg CountTransactionsFilteredParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countTransactionsFiltered,
+		arg.UserID,
+		arg.AccountID,
+		arg.FromDate,
+		arg.ToDate,
+		arg.TransactionType,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const findTransactionByReference = `-- name: FindTransactionByReference :one
 SELECT id, user_id, account_id, source_event_id, amount_minor_units, currency, direction, transaction_type, counterparty, counterparty_identifier, provider_reference, status, user_category_id, user_notes, user_modified, event_timestamp, created_at, updated_at
 FROM transactions
@@ -318,6 +349,75 @@ func (q *Queries) ListTransactionsByUser(ctx context.Context, arg ListTransactio
 	return items, nil
 }
 
+const listTransactionsFiltered = `-- name: ListTransactionsFiltered :many
+SELECT id, user_id, account_id, source_event_id, amount_minor_units, currency, direction, transaction_type, counterparty, counterparty_identifier, provider_reference, status, user_category_id, user_notes, user_modified, event_timestamp, created_at, updated_at
+FROM transactions
+WHERE user_id = $1
+  AND ($4::uuid IS NULL OR account_id = $4)
+  AND ($5::timestamptz IS NULL OR event_timestamp >= $5)
+  AND ($6::timestamptz IS NULL OR event_timestamp <= $6)
+  AND ($7::varchar IS NULL OR transaction_type = $7)
+ORDER BY event_timestamp DESC
+LIMIT $2 OFFSET $3
+`
+
+type ListTransactionsFilteredParams struct {
+	UserID          pgtype.UUID        `json:"user_id"`
+	Limit           int32              `json:"limit"`
+	Offset          int32              `json:"offset"`
+	AccountID       pgtype.UUID        `json:"account_id"`
+	FromDate        pgtype.Timestamptz `json:"from_date"`
+	ToDate          pgtype.Timestamptz `json:"to_date"`
+	TransactionType pgtype.Text        `json:"transaction_type"`
+}
+
+func (q *Queries) ListTransactionsFiltered(ctx context.Context, arg ListTransactionsFilteredParams) ([]Transaction, error) {
+	rows, err := q.db.Query(ctx, listTransactionsFiltered,
+		arg.UserID,
+		arg.Limit,
+		arg.Offset,
+		arg.AccountID,
+		arg.FromDate,
+		arg.ToDate,
+		arg.TransactionType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Transaction{}
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.AccountID,
+			&i.SourceEventID,
+			&i.AmountMinorUnits,
+			&i.Currency,
+			&i.Direction,
+			&i.TransactionType,
+			&i.Counterparty,
+			&i.CounterpartyIdentifier,
+			&i.ProviderReference,
+			&i.Status,
+			&i.UserCategoryID,
+			&i.UserNotes,
+			&i.UserModified,
+			&i.EventTimestamp,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateTransactionStatus = `-- name: UpdateTransactionStatus :one
 UPDATE transactions
 SET status = $3,
@@ -334,6 +434,54 @@ type UpdateTransactionStatusParams struct {
 
 func (q *Queries) UpdateTransactionStatus(ctx context.Context, arg UpdateTransactionStatusParams) (Transaction, error) {
 	row := q.db.QueryRow(ctx, updateTransactionStatus, arg.ID, arg.UserID, arg.Status)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.AccountID,
+		&i.SourceEventID,
+		&i.AmountMinorUnits,
+		&i.Currency,
+		&i.Direction,
+		&i.TransactionType,
+		&i.Counterparty,
+		&i.CounterpartyIdentifier,
+		&i.ProviderReference,
+		&i.Status,
+		&i.UserCategoryID,
+		&i.UserNotes,
+		&i.UserModified,
+		&i.EventTimestamp,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateTransactionUserFields = `-- name: UpdateTransactionUserFields :one
+UPDATE transactions
+SET user_category_id = COALESCE($3, user_category_id),
+    user_notes = COALESCE($4, user_notes),
+    user_modified = true,
+    updated_at = NOW()
+WHERE id = $1 AND user_id = $2
+RETURNING id, user_id, account_id, source_event_id, amount_minor_units, currency, direction, transaction_type, counterparty, counterparty_identifier, provider_reference, status, user_category_id, user_notes, user_modified, event_timestamp, created_at, updated_at
+`
+
+type UpdateTransactionUserFieldsParams struct {
+	ID             pgtype.UUID `json:"id"`
+	UserID         pgtype.UUID `json:"user_id"`
+	UserCategoryID pgtype.UUID `json:"user_category_id"`
+	UserNotes      pgtype.Text `json:"user_notes"`
+}
+
+func (q *Queries) UpdateTransactionUserFields(ctx context.Context, arg UpdateTransactionUserFieldsParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, updateTransactionUserFields,
+		arg.ID,
+		arg.UserID,
+		arg.UserCategoryID,
+		arg.UserNotes,
+	)
 	var i Transaction
 	err := row.Scan(
 		&i.ID,
