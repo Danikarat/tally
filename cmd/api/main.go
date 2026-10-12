@@ -13,6 +13,7 @@ import (
 
 	"github.com/Danikarat/tally/internal/config"
 	"github.com/Danikarat/tally/internal/database"
+	_ "github.com/Danikarat/tally/internal/parsers/mtn"
 	"github.com/Danikarat/tally/internal/server"
 )
 
