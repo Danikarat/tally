@@ -5,6 +5,46 @@ import (
 	"time"
 )
 
+// Provider represents a canonical financial service provider.
+type Provider string
+
+const (
+	ProviderMTN     Provider = "MTN"
+	ProviderTelecel Provider = "TELECEL"
+	ProviderATMoney Provider = "AT_MONEY"
+	ProviderUnknown Provider = "UNKNOWN"
+)
+
+// String returns the string representation of the provider.
+func (p Provider) String() string {
+	return string(p)
+}
+
+// Common source types
+const (
+	SourceTypeSMS       = "SMS"
+	SourceTypeStatement = "STATEMENT"
+	SourceTypeEmail     = "EMAIL"
+	SourceTypeManual    = "MANUAL"
+)
+
+// Common transaction directions
+const (
+	DirectionInbound  = "INBOUND"
+	DirectionOutbound = "OUTBOUND"
+)
+
+// Common transaction types
+const (
+	TxTypeExpense        = "EXPENSE"
+	TxTypeIncome         = "INCOME"
+	TxTypeTransfer       = "TRANSFER"
+	TxTypeRefund         = "REFUND"
+	TxTypeFee            = "FEE"
+	TxTypeCashWithdrawal = "CASH_WITHDRAWAL"
+	TxTypeUnknown        = "UNKNOWN"
+)
+
 var (
 	// ErrUnsupportedProvider is returned when no registered parser recognizes the sender identifier.
 	ErrUnsupportedProvider = errors.New("unsupported sender or provider")
@@ -18,7 +58,7 @@ var (
 
 // TransactionCandidate represents the normalized extraction result from a provider message.
 type TransactionCandidate struct {
-	Provider               string    `json:"provider"`
+	Provider               Provider  `json:"provider"`
 	SourceType             string    `json:"source_type"`
 	Sender                 string    `json:"sender"`
 	AmountMinorUnits       int64     `json:"amount_minor_units"`

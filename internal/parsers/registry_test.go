@@ -16,8 +16,8 @@ type mockParser struct {
 	parseFn    func(sender, body string) (parsers.TransactionCandidate, error)
 }
 
-func (m *mockParser) Provider() string {
-	return m.provider
+func (m *mockParser) Provider() parsers.Provider {
+	return parsers.Provider(m.provider)
 }
 
 func (m *mockParser) CanParse(sender, body string) bool {
@@ -32,7 +32,7 @@ func (m *mockParser) Parse(sender, body string) (parsers.TransactionCandidate, e
 		return m.parseFn(sender, body)
 	}
 	return parsers.TransactionCandidate{
-		Provider:         m.provider,
+		Provider:         parsers.Provider(m.provider),
 		AmountMinorUnits: 1000,
 		Currency:         "GHS",
 		Direction:        "OUTBOUND",
@@ -52,7 +52,7 @@ func TestRegistry_RegistrationAndDispatch(t *testing.T) {
 		parseFn: func(sender, body string) (parsers.TransactionCandidate, error) {
 			if strings.Contains(body, "Payment of") {
 				return parsers.TransactionCandidate{
-					Provider:         "MTN",
+					Provider:         parsers.ProviderMTN,
 					SourceType:       "SMS",
 					Sender:           sender,
 					AmountMinorUnits: 5000,
@@ -74,7 +74,7 @@ func TestRegistry_RegistrationAndDispatch(t *testing.T) {
 		},
 		parseFn: func(sender, body string) (parsers.TransactionCandidate, error) {
 			return parsers.TransactionCandidate{
-				Provider:         "TELECEL",
+				Provider:         parsers.ProviderTelecel,
 				SourceType:       "SMS",
 				Sender:           sender,
 				AmountMinorUnits: 7500,
@@ -95,7 +95,7 @@ func TestRegistry_RegistrationAndDispatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected successful MTN parse, got error: %v", err)
 	}
-	if resMTN.Provider != "MTN" || resMTN.AmountMinorUnits != 5000 {
+	if resMTN.Provider != parsers.ProviderMTN || resMTN.AmountMinorUnits != 5000 {
 		t.Errorf("unexpected MTN candidate: %+v", resMTN)
 	}
 
@@ -104,7 +104,7 @@ func TestRegistry_RegistrationAndDispatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected successful Telecel parse, got error: %v", err)
 	}
-	if resTelecel.Provider != "TELECEL" || resTelecel.AmountMinorUnits != 7500 {
+	if resTelecel.Provider != parsers.ProviderTelecel || resTelecel.AmountMinorUnits != 7500 {
 		t.Errorf("unexpected Telecel candidate: %+v", resTelecel)
 	}
 
@@ -118,6 +118,31 @@ func TestRegistry_RegistrationAndDispatch(t *testing.T) {
 	_, err = reg.Parse("MobileMoney", "Malformed unparseable text without keywords")
 	if !errors.Is(err, parsers.ErrUnrecognizedFormat) {
 		t.Errorf("expected ErrUnrecognizedFormat, got: %v", err)
+	}
+}
+
+func TestRegistry_DetectProvider(t *testing.T) {
+	tests := []struct {
+		sender   string
+		body     string
+		expected parsers.Provider
+	}{
+		{"MobileMoney", "Any text", parsers.ProviderMTN},
+		{"MTN", "Payment notice", parsers.ProviderMTN},
+		{"Unknown", "Visit mtnmymomo.onelink.me", parsers.ProviderMTN},
+		{"TelecelCash", "Any text", parsers.ProviderTelecel},
+		{"vodafone", "Payment made", parsers.ProviderTelecel},
+		{"Alert", "Telecel Cash received", parsers.ProviderTelecel},
+		{"ATMoney", "Payment made", parsers.ProviderATMoney},
+		{"airteltigo", "Balance info", parsers.ProviderATMoney},
+		{"BankAlert", "Unknown bank message", parsers.ProviderUnknown},
+	}
+
+	for _, tc := range tests {
+		got := parsers.DetectProvider(tc.sender, tc.body)
+		if got != tc.expected {
+			t.Errorf("DetectProvider(%q, %q): got %q, want %q", tc.sender, tc.body, got, tc.expected)
+		}
 	}
 }
 
@@ -160,7 +185,7 @@ func TestRegistry_ConcurrentOperations(t *testing.T) {
 		},
 		parseFn: func(sender, body string) (parsers.TransactionCandidate, error) {
 			return parsers.TransactionCandidate{
-				Provider:         "MTN",
+				Provider:         parsers.ProviderMTN,
 				AmountMinorUnits: 2500,
 			}, nil
 		},

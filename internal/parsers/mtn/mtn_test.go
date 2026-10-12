@@ -13,16 +13,16 @@ import (
 )
 
 type FixtureExpected struct {
-	Provider               string  `json:"provider"`
-	AmountMinorUnits       int64   `json:"amount_minor_units"`
-	Currency               string  `json:"currency"`
-	Direction              string  `json:"direction"`
-	TransactionType        string  `json:"transaction_type"`
-	Counterparty           *string `json:"counterparty"`
-	CounterpartyIdentifier *string `json:"counterparty_identifier"`
-	ProviderReference      *string `json:"provider_reference"`
-	BalanceMinorUnits      *int64  `json:"balance_minor_units"`
-	FeeMinorUnits          *int64  `json:"fee_minor_units"`
+	Provider               parsers.Provider `json:"provider"`
+	AmountMinorUnits       int64            `json:"amount_minor_units"`
+	Currency               string           `json:"currency"`
+	Direction              string           `json:"direction"`
+	TransactionType        string           `json:"transaction_type"`
+	Counterparty           *string          `json:"counterparty"`
+	CounterpartyIdentifier *string          `json:"counterparty_identifier"`
+	ProviderReference      *string          `json:"provider_reference"`
+	BalanceMinorUnits      *int64           `json:"balance_minor_units"`
+	FeeMinorUnits          *int64           `json:"fee_minor_units"`
 }
 
 type Fixture struct {
@@ -40,7 +40,7 @@ func TestMtnMomoParser_Fixtures(t *testing.T) {
 	}
 
 	parser := mtn.New()
-	if parser.Provider() != "MTN" {
+	if parser.Provider() != parsers.ProviderMTN {
 		t.Fatalf("expected provider 'MTN', got %q", parser.Provider())
 	}
 
@@ -148,6 +148,61 @@ func TestMtnMomoParser_Fixtures(t *testing.T) {
 	}
 }
 
+func TestMtnMomoParser_ClassifyFlow(t *testing.T) {
+	p := mtn.New()
+
+	cases := []struct {
+		name     string
+		body     string
+		expected mtn.FlowType
+	}{
+		{
+			name:     "cash out withdrawal",
+			body:     "Cash Out made for GHS50.00 to ACCRA AGENT. Current Balance: GHS3.41 Transaction Id: 123.",
+			expected: mtn.FlowCashOutWithdrawal,
+		},
+		{
+			name:     "cash in deposit",
+			body:     "Cash In received for GHS 100.00 from KUMASI VENTURES. Current Balance GHS 115.45 Transaction ID: 123.",
+			expected: mtn.FlowCashInDeposit,
+		},
+		{
+			name:     "payment received",
+			body:     "Payment received for GHS 58.00 from KWAME ASANTE Current Balance: GHS 61.41 Transaction ID: 123.",
+			expected: mtn.FlowPaymentReceived,
+		},
+		{
+			name:     "payment made transfer",
+			body:     "Payment made for GHS 35.00 to KOFI MENSAH Current Balance: GHS 22.91 Transaction ID: 123.",
+			expected: mtn.FlowTransferSent,
+		},
+		{
+			name:     "bill payment expense",
+			body:     "Payment for GHS10.00 to Bills.INV ..Current Balance: GHS 56.91. Transaction Id: 123.",
+			expected: mtn.FlowPaymentExpense,
+		},
+		{
+			name:     "non-financial OTP",
+			body:     "Your one-time password is 123456.",
+			expected: mtn.FlowNonFinancial,
+		},
+		{
+			name:     "unknown empty string",
+			body:     "",
+			expected: mtn.FlowUnknown,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := p.ClassifyFlow(tc.body)
+			if got != tc.expected {
+				t.Errorf("ClassifyFlow: got %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
 func TestMtnMomoParser_CanParse(t *testing.T) {
 	p := mtn.New()
 
@@ -233,7 +288,7 @@ func TestMtnMomoParser_RegistryIntegration(t *testing.T) {
 		t.Fatalf("expected ParseDefault to succeed, got: %v", err)
 	}
 
-	if cand.Provider != "MTN" {
+	if cand.Provider != parsers.ProviderMTN {
 		t.Errorf("expected Provider 'MTN', got %q", cand.Provider)
 	}
 	if cand.AmountMinorUnits != 3500 {
