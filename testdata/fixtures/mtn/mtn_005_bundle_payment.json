@@ -1,0 +1,17 @@
+{
+  "id": "mtn_005_bundle_payment",
+  "sender": "MobileMoney",
+  "raw_body": "Payment for GHS3.00 to MTN BUNDLE .Current Balance: GHS 53.91. Transaction Id: 91338000005. Fee charged: GHS0.00,Tax Charged 0.Download the MoMo App for a Faster & Easier Experience. Click here: https://mtnmymomo.onelink.me/XJOt/MoMo",
+  "expected": {
+    "provider": "MTN",
+    "amount_minor_units": 300,
+    "currency": "GHS",
+    "direction": "OUTBOUND",
+    "transaction_type": "EXPENSE",
+    "counterparty": "MTN BUNDLE",
+    "counterparty_identifier": null,
+    "provider_reference": "91338000005",
+    "balance_minor_units": 5391,
+    "fee_minor_units": 0
+  }
+}

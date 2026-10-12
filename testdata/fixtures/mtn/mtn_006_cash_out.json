@@ -1,0 +1,17 @@
+{
+  "id": "mtn_006_cash_out",
+  "sender": "MobileMoney",
+  "raw_body": "Cash Out made for GHS50.00 to ACCRA AGENT VENTURES. Current Balance: GHS3.41 Financial Transaction Id: 91352000006. Cash-out fee is charged automatically from your MTN MoMo wallet. Please do not pay any fees to the Agent. Thank you for using MTN MobileMoney. Fee charged: GHS0.50.",
+  "expected": {
+    "provider": "MTN",
+    "amount_minor_units": 5000,
+    "currency": "GHS",
+    "direction": "OUTBOUND",
+    "transaction_type": "CASH_WITHDRAWAL",
+    "counterparty": "ACCRA AGENT VENTURES",
+    "counterparty_identifier": null,
+    "provider_reference": "91352000006",
+    "balance_minor_units": 341,
+    "fee_minor_units": 50
+  }
+}

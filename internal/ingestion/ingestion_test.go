@@ -133,8 +133,8 @@ func TestIngest_ValidationErrors(t *testing.T) {
 				{
 					SourceType:       "SMS",
 					Provider:         "MTN",
-					AmountMinorUnits: 0, // Invalid: must be > 0
-					Currency:         "GH", // Invalid: must be 3 characters
+					AmountMinorUnits: 0,             // Invalid: must be > 0
+					Currency:         "GH",          // Invalid: must be 3 characters
 					Direction:        "INVALID_DIR", // Invalid
 					TransactionType:  "EXPENSE",
 					EventTimestamp:   time.Now().UTC(),
@@ -209,32 +209,32 @@ func TestIngest_ValidBatchAndTenantIsolation(t *testing.T) {
 	batch := ingestion.IngestRequest{
 		Candidates: []ingestion.TransactionCandidate{
 			{
-				SourceType:             "SMS",
-				Provider:               "MTN",
-				SenderIdentifier:       stringPtr("MobileMoney"),
-				ExternalReference:      stringPtr("EXT-101"),
-				RawPayload:             stringPtr("Payment of GHS 45.00 made to Fuel Station. Ref: 101."),
-				AmountMinorUnits:       4500, // 45.00 GHS
-				Currency:               "GHS",
-				Direction:              "OUTBOUND",
-				TransactionType:        "EXPENSE",
-				Counterparty:           stringPtr("Fuel Station"),
-				ProviderReference:      stringPtr("TX-MTN-101"),
-				EventTimestamp:         now,
+				SourceType:        "SMS",
+				Provider:          "MTN",
+				SenderIdentifier:  stringPtr("MobileMoney"),
+				ExternalReference: stringPtr("EXT-101"),
+				RawPayload:        stringPtr("Payment of GHS 45.00 made to Fuel Station. Ref: 101."),
+				AmountMinorUnits:  4500, // 45.00 GHS
+				Currency:          "GHS",
+				Direction:         "OUTBOUND",
+				TransactionType:   "EXPENSE",
+				Counterparty:      stringPtr("Fuel Station"),
+				ProviderReference: stringPtr("TX-MTN-101"),
+				EventTimestamp:    now,
 			},
 			{
-				SourceType:             "SMS",
-				Provider:               "MTN",
-				SenderIdentifier:       stringPtr("MobileMoney"),
-				ExternalReference:      stringPtr("EXT-102"),
-				RawPayload:             stringPtr("Received GHS 120.00 from Ama Mensah. Ref: 102."),
-				AmountMinorUnits:       12000, // 120.00 GHS
-				Currency:               "GHS",
-				Direction:              "INBOUND",
-				TransactionType:        "INCOME",
-				Counterparty:           stringPtr("Ama Mensah"),
-				ProviderReference:      stringPtr("TX-MTN-102"),
-				EventTimestamp:         now.Add(1 * time.Hour),
+				SourceType:        "SMS",
+				Provider:          "MTN",
+				SenderIdentifier:  stringPtr("MobileMoney"),
+				ExternalReference: stringPtr("EXT-102"),
+				RawPayload:        stringPtr("Received GHS 120.00 from Ama Mensah. Ref: 102."),
+				AmountMinorUnits:  12000, // 120.00 GHS
+				Currency:          "GHS",
+				Direction:         "INBOUND",
+				TransactionType:   "INCOME",
+				Counterparty:      stringPtr("Ama Mensah"),
+				ProviderReference: stringPtr("TX-MTN-102"),
+				EventTimestamp:    now.Add(1 * time.Hour),
 			},
 		},
 	}

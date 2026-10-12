@@ -11,9 +11,9 @@ import (
 )
 
 type mockParser struct {
-	provider    string
-	canParseFn  func(sender, body string) bool
-	parseFn     func(sender, body string) (parsers.TransactionCandidate, error)
+	provider   string
+	canParseFn func(sender, body string) bool
+	parseFn    func(sender, body string) (parsers.TransactionCandidate, error)
 }
 
 func (m *mockParser) Provider() string {

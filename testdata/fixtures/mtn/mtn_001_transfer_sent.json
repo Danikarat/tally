@@ -1,0 +1,17 @@
+{
+  "id": "mtn_001_transfer_sent",
+  "sender": "MobileMoney",
+  "raw_body": "Payment made for GHS 35.00 to KOFI MENSAH Current Balance: GHS 22.91 . Available Balance: GHS 22.91. Reference: Lunch. Transaction ID: 91383000001. Fee charged: GHS0.50 Tax charged: 0. Download the MoMo App for a Faster & Easier Experience. Click here: https://mtnmymomo.onelink.me/XJOt/MoMo",
+  "expected": {
+    "provider": "MTN",
+    "amount_minor_units": 3500,
+    "currency": "GHS",
+    "direction": "OUTBOUND",
+    "transaction_type": "TRANSFER",
+    "counterparty": "KOFI MENSAH",
+    "counterparty_identifier": null,
+    "provider_reference": "91383000001",
+    "balance_minor_units": 2291,
+    "fee_minor_units": 50
+  }
+}

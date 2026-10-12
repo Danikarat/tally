@@ -1,0 +1,17 @@
+{
+  "id": "mtn_003_cash_in_received",
+  "sender": "MobileMoney",
+  "raw_body": "Cash In received for GHS 100.00 from KUMASI VENTURES. Current Balance GHS 115.45 Available Balance GHS 115.45. Transaction ID: 91240000003. Fee charged: GHS 0. Cash in (Deposit) is a free transaction on MTN Mobile Money. Please do not pay any fees for it.",
+  "expected": {
+    "provider": "MTN",
+    "amount_minor_units": 10000,
+    "currency": "GHS",
+    "direction": "INBOUND",
+    "transaction_type": "TRANSFER",
+    "counterparty": "KUMASI VENTURES",
+    "counterparty_identifier": null,
+    "provider_reference": "91240000003",
+    "balance_minor_units": 11545,
+    "fee_minor_units": 0
+  }
+}

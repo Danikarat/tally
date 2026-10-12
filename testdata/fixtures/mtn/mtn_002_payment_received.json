@@ -1,0 +1,17 @@
+{
+  "id": "mtn_002_payment_received",
+  "sender": "MobileMoney",
+  "raw_body": "Payment received for GHS 58.00 from KWAME ASANTE Current Balance: GHS 61.41 . Available Balance: GHS 61.41. Reference: KWAME ASANTE ,233500000001,1 from VODAFONE. Transaction ID: 91377000002. TRANSACTION FEE: 0.00",
+  "expected": {
+    "provider": "MTN",
+    "amount_minor_units": 5800,
+    "currency": "GHS",
+    "direction": "INBOUND",
+    "transaction_type": "TRANSFER",
+    "counterparty": "KWAME ASANTE",
+    "counterparty_identifier": "233500000001",
+    "provider_reference": "91377000002",
+    "balance_minor_units": 6141,
+    "fee_minor_units": 0
+  }
+}
