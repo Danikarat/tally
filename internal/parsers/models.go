@@ -45,12 +45,23 @@ const (
 	TxTypeUnknown        = "UNKNOWN"
 )
 
+// Common transaction statuses
+const (
+	TxStatusCompleted = "COMPLETED"
+	TxStatusPending   = "PENDING"
+	TxStatusFailed    = "FAILED"
+	TxStatusReversed  = "REVERSED"
+)
+
 var (
 	// ErrUnsupportedProvider is returned when no registered parser recognizes the sender identifier.
 	ErrUnsupportedProvider = errors.New("unsupported sender or provider")
 
 	// ErrUnrecognizedFormat is returned when a parser recognizes the provider but the message text does not match expected patterns.
 	ErrUnrecognizedFormat = errors.New("unrecognized message format for provider")
+
+	// ErrMalformedMessage is returned when a message contains recognizable keywords but is truncated or missing critical fields.
+	ErrMalformedMessage = errors.New("malformed or truncated message")
 
 	// ErrNonFinancialMessage is returned when a message from a financial provider is determined to be non-financial (e.g. promo, OTP, system alert).
 	ErrNonFinancialMessage = errors.New("message is non-financial")
@@ -61,6 +72,7 @@ type TransactionCandidate struct {
 	Provider               Provider  `json:"provider"`
 	SourceType             string    `json:"source_type"`
 	Sender                 string    `json:"sender"`
+	Status                 string    `json:"status"`
 	AmountMinorUnits       int64     `json:"amount_minor_units"`
 	Currency               string    `json:"currency"`
 	Direction              string    `json:"direction"`

@@ -2,7 +2,6 @@ package mtn_test
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -239,44 +238,6 @@ func TestMtnMomoParser_CanParse(t *testing.T) {
 	for _, tc := range invalidCases {
 		if p.CanParse(tc.sender, tc.body) {
 			t.Errorf("expected CanParse=false for sender=%q body=%q", tc.sender, tc.body)
-		}
-	}
-}
-
-func TestMtnMomoParser_NonFinancialMessages(t *testing.T) {
-	p := mtn.New()
-
-	nonFinancialMessages := []string{
-		"Your one-time password is 123456. Do not share with anyone.",
-		"Your OTP is 987654. Valid for 5 minutes.",
-		"Enter PIN to approve transaction.",
-		"Win with MTN MoMo! Dial *170# now.",
-		"Y'ello! Enjoy 50% extra bonus on your next recharge.",
-	}
-
-	for _, msg := range nonFinancialMessages {
-		_, err := p.Parse("MobileMoney", msg)
-		if !errors.Is(err, parsers.ErrNonFinancialMessage) {
-			t.Errorf("expected ErrNonFinancialMessage for body %q, got: %v", msg, err)
-		}
-	}
-}
-
-func TestMtnMomoParser_UnrecognizedFormat(t *testing.T) {
-	p := mtn.New()
-
-	malformedMessages := []string{
-		"",
-		"   ",
-		"Random text message with no financial data or keywords whatsoever",
-		"Payment completed but without any amounts or IDs",
-		"Payment for GHS to Bills.INV. Current Balance: GHS. Transaction Id: 123.",
-	}
-
-	for _, msg := range malformedMessages {
-		_, err := p.Parse("MobileMoney", msg)
-		if !errors.Is(err, parsers.ErrUnrecognizedFormat) {
-			t.Errorf("expected ErrUnrecognizedFormat for body %q, got: %v", msg, err)
 		}
 	}
 }

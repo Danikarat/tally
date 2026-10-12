@@ -22,7 +22,9 @@ const (
 	FlowCashInDeposit
 	FlowPaymentExpense
 	FlowCashOutWithdrawal
+	FlowFailedTransaction
 	FlowNonFinancial
+	FlowMalformed
 )
 
 // MtnMomoParser implements parsers.ProviderAdapter for MTN MoMo Ghana.
@@ -53,8 +55,19 @@ var (
 	reBalance       = regexp.MustCompile(`(?i)Current\s+Balance:?\s*(?:GHS\s*)?([\d,]+\.?\d*)`)
 	reFee           = regexp.MustCompile(`(?i)(?:Fee\s+charged|TRANSACTION\s+FEE|Fee\s+was):\s*(?:GHS\s*)?([\d,]+\.?\d*)`)
 	rePhoneInRef    = regexp.MustCompile(`,\s*(\d{10,14})\b`)
-	reNonFinancial  = regexp.MustCompile(`(?i)(?:one[\s-]time\s+password|your\s+otp\s+is|enter\s+pin\s+to\s+approve|dial\s+\*170#|win\s+with\s+mtn|y'ello!\s+enjoy)`)
 	reTrailingPhone = regexp.MustCompile(`^(.*?)\s+(\d{10,14})$`)
+
+	// Non-financial patterns (promos, balance inquiries, security OTPs)
+	reNonFinancial = regexp.MustCompile(`(?i)(?:one[\s-]time\s+password|your\s+otp\s+is|enter\s+(?:mm\s+)?pin|dial\s+\*170#|win\s+with\s+mtn|y'ello!\s+enjoy|authorize\s+payment|do\s+not\s+share\s+your\s+(?:momo\s+)?pin|your\s+current\s+balance\s+is|dear\s+customer,?\s+your\s+balance\s+is|your\s+balance\s+is\s+ghs)`)
+
+	// Balance inquiry with no transaction action
+	rePureBalance = regexp.MustCompile(`(?i)^(?:Current\s+Balance:?\s*GHS|Your\s+balance\s+is|Dear\s+Customer).*?(?:Available\s+Balance|Balance\s+is)`)
+
+	// Failed transaction pattern
+	reFailed = regexp.MustCompile(`(?i)(?:transaction\s+(?:id:?\s*)?[A-Za-z0-9]+\s+failed|payment\s+.*?failed|failed\s+due\s+to|transaction\s+failed)`)
+
+	// Known transaction prefixes (for detecting truncated / malformed messages)
+	reKnownPrefix = regexp.MustCompile(`(?i)^(?:Cash\s+Out\s+made|Cash\s+In\s+received|Payment\s+received|Payment\s+made|Payment\s+of|Payment\s+for)`)
 
 	// Flow-specific matchers
 	reCashOut         = regexp.MustCompile(`(?i)^Cash\s+Out\s+made\s+for\s+GHS\s*([\d,]+\.?\d*)\s+to\s+(.+?)(?:\.\s*Current|\s+Current)`)
@@ -72,24 +85,36 @@ func (p *MtnMomoParser) ClassifyFlow(body string) FlowType {
 		return FlowUnknown
 	}
 
-	if reNonFinancial.MatchString(trimmed) && !reTxID.MatchString(trimmed) {
+	// 1. Explicit Non-Financial notifications
+	if (reNonFinancial.MatchString(trimmed) || rePureBalance.MatchString(trimmed)) && !reTxID.MatchString(trimmed) {
 		return FlowNonFinancial
 	}
 
-	switch {
-	case reCashOut.MatchString(trimmed):
-		return FlowCashOutWithdrawal
-	case reCashIn.MatchString(trimmed):
-		return FlowCashInDeposit
-	case rePaymentReceived.MatchString(trimmed):
-		return FlowPaymentReceived
-	case rePaymentMade.MatchString(trimmed) || rePaymentOf.MatchString(trimmed):
-		return FlowTransferSent
-	case rePaymentFor.MatchString(trimmed):
-		return FlowPaymentExpense
-	default:
-		return FlowUnknown
+	// 2. Failed transactions
+	if reFailed.MatchString(trimmed) {
+		return FlowFailedTransaction
 	}
+
+	// 3. Complete valid transaction flows
+	switch {
+	case reCashOut.MatchString(trimmed) && reTxID.MatchString(trimmed):
+		return FlowCashOutWithdrawal
+	case reCashIn.MatchString(trimmed) && reTxID.MatchString(trimmed):
+		return FlowCashInDeposit
+	case rePaymentReceived.MatchString(trimmed) && reTxID.MatchString(trimmed):
+		return FlowPaymentReceived
+	case (rePaymentMade.MatchString(trimmed) || rePaymentOf.MatchString(trimmed)) && reTxID.MatchString(trimmed):
+		return FlowTransferSent
+	case rePaymentFor.MatchString(trimmed) && reTxID.MatchString(trimmed):
+		return FlowPaymentExpense
+	}
+
+	// 4. Truncated or malformed transaction notifications
+	if reKnownPrefix.MatchString(trimmed) {
+		return FlowMalformed
+	}
+
+	return FlowUnknown
 }
 
 // Parse extracts normalized transaction fields using a flow-based switch.
@@ -108,8 +133,12 @@ func (p *MtnMomoParser) Parse(sender, body string) (parsers.TransactionCandidate
 		return p.parseTransferSent(sender, trimmed)
 	case FlowPaymentExpense:
 		return p.parsePaymentExpense(sender, trimmed)
+	case FlowFailedTransaction:
+		return p.parseFailedTransaction(sender, trimmed)
 	case FlowNonFinancial:
 		return parsers.TransactionCandidate{}, parsers.ErrNonFinancialMessage
+	case FlowMalformed:
+		return parsers.TransactionCandidate{}, parsers.ErrMalformedMessage
 	default:
 		return parsers.TransactionCandidate{}, parsers.ErrUnrecognizedFormat
 	}
@@ -118,12 +147,12 @@ func (p *MtnMomoParser) Parse(sender, body string) (parsers.TransactionCandidate
 func (p *MtnMomoParser) parseCashOut(sender, body string) (parsers.TransactionCandidate, error) {
 	matches := reCashOut.FindStringSubmatch(body)
 	if len(matches) < 3 {
-		return parsers.TransactionCandidate{}, parsers.ErrUnrecognizedFormat
+		return parsers.TransactionCandidate{}, parsers.ErrMalformedMessage
 	}
 
 	amount, err := parseAmountToMinorUnits(matches[1])
 	if err != nil {
-		return parsers.TransactionCandidate{}, fmt.Errorf("%w: invalid cash out amount %s", parsers.ErrUnrecognizedFormat, matches[1])
+		return parsers.TransactionCandidate{}, fmt.Errorf("%w: invalid cash out amount %s", parsers.ErrMalformedMessage, matches[1])
 	}
 
 	counterparty := cleanCounterparty(matches[2])
@@ -133,12 +162,12 @@ func (p *MtnMomoParser) parseCashOut(sender, body string) (parsers.TransactionCa
 func (p *MtnMomoParser) parseCashIn(sender, body string) (parsers.TransactionCandidate, error) {
 	matches := reCashIn.FindStringSubmatch(body)
 	if len(matches) < 3 {
-		return parsers.TransactionCandidate{}, parsers.ErrUnrecognizedFormat
+		return parsers.TransactionCandidate{}, parsers.ErrMalformedMessage
 	}
 
 	amount, err := parseAmountToMinorUnits(matches[1])
 	if err != nil {
-		return parsers.TransactionCandidate{}, fmt.Errorf("%w: invalid cash in amount %s", parsers.ErrUnrecognizedFormat, matches[1])
+		return parsers.TransactionCandidate{}, fmt.Errorf("%w: invalid cash in amount %s", parsers.ErrMalformedMessage, matches[1])
 	}
 
 	counterparty := cleanCounterparty(matches[2])
@@ -148,12 +177,12 @@ func (p *MtnMomoParser) parseCashIn(sender, body string) (parsers.TransactionCan
 func (p *MtnMomoParser) parsePaymentReceived(sender, body string) (parsers.TransactionCandidate, error) {
 	matches := rePaymentReceived.FindStringSubmatch(body)
 	if len(matches) < 3 {
-		return parsers.TransactionCandidate{}, parsers.ErrUnrecognizedFormat
+		return parsers.TransactionCandidate{}, parsers.ErrMalformedMessage
 	}
 
 	amount, err := parseAmountToMinorUnits(matches[1])
 	if err != nil {
-		return parsers.TransactionCandidate{}, fmt.Errorf("%w: invalid payment received amount %s", parsers.ErrUnrecognizedFormat, matches[1])
+		return parsers.TransactionCandidate{}, fmt.Errorf("%w: invalid payment received amount %s", parsers.ErrMalformedMessage, matches[1])
 	}
 
 	counterparty := cleanCounterparty(matches[2])
@@ -175,12 +204,12 @@ func (p *MtnMomoParser) parseTransferSent(sender, body string) (parsers.Transact
 	}
 
 	if len(matches) < 3 {
-		return parsers.TransactionCandidate{}, parsers.ErrUnrecognizedFormat
+		return parsers.TransactionCandidate{}, parsers.ErrMalformedMessage
 	}
 
 	amount, err := parseAmountToMinorUnits(matches[1])
 	if err != nil {
-		return parsers.TransactionCandidate{}, fmt.Errorf("%w: invalid transfer sent amount %s", parsers.ErrUnrecognizedFormat, matches[1])
+		return parsers.TransactionCandidate{}, fmt.Errorf("%w: invalid transfer sent amount %s", parsers.ErrMalformedMessage, matches[1])
 	}
 
 	counterparty := cleanCounterparty(matches[2])
@@ -197,16 +226,42 @@ func (p *MtnMomoParser) parseTransferSent(sender, body string) (parsers.Transact
 func (p *MtnMomoParser) parsePaymentExpense(sender, body string) (parsers.TransactionCandidate, error) {
 	matches := rePaymentFor.FindStringSubmatch(body)
 	if len(matches) < 3 {
-		return parsers.TransactionCandidate{}, parsers.ErrUnrecognizedFormat
+		return parsers.TransactionCandidate{}, parsers.ErrMalformedMessage
 	}
 
 	amount, err := parseAmountToMinorUnits(matches[1])
 	if err != nil {
-		return parsers.TransactionCandidate{}, fmt.Errorf("%w: invalid bill/bundle payment amount %s", parsers.ErrUnrecognizedFormat, matches[1])
+		return parsers.TransactionCandidate{}, fmt.Errorf("%w: invalid bill/bundle payment amount %s", parsers.ErrMalformedMessage, matches[1])
 	}
 
 	counterparty := cleanCounterparty(matches[2])
 	return p.buildCandidate(sender, body, amount, parsers.DirectionOutbound, parsers.TxTypeExpense, counterparty, nil)
+}
+
+func (p *MtnMomoParser) parseFailedTransaction(sender, body string) (parsers.TransactionCandidate, error) {
+	var providerRef *string
+	if txMatch := reTxID.FindStringSubmatch(body); len(txMatch) >= 2 {
+		ref := txMatch[1]
+		providerRef = &ref
+	}
+
+	h := sha256.Sum256([]byte(body))
+	payloadHash := hex.EncodeToString(h[:])
+
+	return parsers.TransactionCandidate{
+		Provider:          parsers.ProviderMTN,
+		SourceType:        parsers.SourceTypeSMS,
+		Sender:            sender,
+		Status:            parsers.TxStatusFailed,
+		AmountMinorUnits:  0, // Zero expense on failure
+		Currency:          "GHS",
+		Direction:         parsers.DirectionOutbound,
+		TransactionType:   parsers.TxTypeExpense,
+		ProviderReference: providerRef,
+		EventTimestamp:    time.Now().UTC(),
+		RawPayload:        body,
+		PayloadHash:       payloadHash,
+	}, nil
 }
 
 func (p *MtnMomoParser) buildCandidate(
@@ -217,7 +272,7 @@ func (p *MtnMomoParser) buildCandidate(
 ) (parsers.TransactionCandidate, error) {
 	txMatch := reTxID.FindStringSubmatch(rawBody)
 	if len(txMatch) < 2 {
-		return parsers.TransactionCandidate{}, parsers.ErrUnrecognizedFormat
+		return parsers.TransactionCandidate{}, parsers.ErrMalformedMessage
 	}
 	providerRef := txMatch[1]
 
@@ -247,6 +302,7 @@ func (p *MtnMomoParser) buildCandidate(
 		Provider:               parsers.ProviderMTN,
 		SourceType:             parsers.SourceTypeSMS,
 		Sender:                 sender,
+		Status:                 parsers.TxStatusCompleted,
 		AmountMinorUnits:       amountMinor,
 		Currency:               "GHS",
 		Direction:              direction,
