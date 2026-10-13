@@ -59,6 +59,9 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
 
+    // Security & EncryptedSharedPreferences
+    implementation(libs.androidx.security.crypto)
+
     // Dagger Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
