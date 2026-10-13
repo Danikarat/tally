@@ -52,7 +52,6 @@ func New(cfg *config.Config, logger *slog.Logger, db *pgxpool.Pool) *Server {
 // setupMiddleware attaches standard HTTP middlewares.
 func (s *Server) setupMiddleware() {
 	s.router.Use(middleware.RequestID)
-	s.router.Use(middleware.RealIP)
 	s.router.Use(s.slogMiddleware())
 	s.router.Use(middleware.Recoverer)
 	s.router.Use(middleware.Timeout(60 * time.Second))

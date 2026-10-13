@@ -105,7 +105,10 @@ func TestAuth_RegisterAndLogin_Lifecycle(t *testing.T) {
 		"email":    "other@example.com",
 		"password": "weak",
 	})
-	respWeak, _ := client.Post(ts.URL+"/v1/auth/register", "application/json", bytes.NewReader(weakBody))
+	respWeak, err := client.Post(ts.URL+"/v1/auth/register", "application/json", bytes.NewReader(weakBody))
+	if err != nil {
+		t.Fatalf("failed to send weak password request: %v", err)
+	}
 	defer respWeak.Body.Close()
 
 	if respWeak.StatusCode != http.StatusBadRequest {
@@ -117,7 +120,10 @@ func TestAuth_RegisterAndLogin_Lifecycle(t *testing.T) {
 		"email":    "not-an-email",
 		"password": "StrongP@ssw0rd1",
 	})
-	respEmail, _ := client.Post(ts.URL+"/v1/auth/register", "application/json", bytes.NewReader(invalidEmailBody))
+	respEmail, err := client.Post(ts.URL+"/v1/auth/register", "application/json", bytes.NewReader(invalidEmailBody))
+	if err != nil {
+		t.Fatalf("failed to send invalid email request: %v", err)
+	}
 	defer respEmail.Body.Close()
 
 	if respEmail.StatusCode != http.StatusBadRequest {
@@ -181,7 +187,10 @@ func TestAuth_RegisterAndLogin_Lifecycle(t *testing.T) {
 		"email":    "kwame.mensah@example.com",
 		"password": "WrongPassword123!",
 	})
-	respWrongPass, _ := client.Post(ts.URL+"/v1/auth/login", "application/json", bytes.NewReader(wrongPassBody))
+	respWrongPass, err := client.Post(ts.URL+"/v1/auth/login", "application/json", bytes.NewReader(wrongPassBody))
+	if err != nil {
+		t.Fatalf("failed to send wrong password login request: %v", err)
+	}
 	defer respWrongPass.Body.Close()
 
 	if respWrongPass.StatusCode != http.StatusUnauthorized {
@@ -193,7 +202,10 @@ func TestAuth_RegisterAndLogin_Lifecycle(t *testing.T) {
 		"email":    "nobody@example.com",
 		"password": "StrongP@ssw0rd1",
 	})
-	respNonExistent, _ := client.Post(ts.URL+"/v1/auth/login", "application/json", bytes.NewReader(nonExistentBody))
+	respNonExistent, err := client.Post(ts.URL+"/v1/auth/login", "application/json", bytes.NewReader(nonExistentBody))
+	if err != nil {
+		t.Fatalf("failed to send non-existent email login request: %v", err)
+	}
 	defer respNonExistent.Body.Close()
 
 	if respNonExistent.StatusCode != http.StatusUnauthorized {
