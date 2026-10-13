@@ -2,6 +2,8 @@ package com.danikarat.tally.di
 
 import com.danikarat.tally.data.repository.AuthRepository
 import com.danikarat.tally.data.repository.AuthRepositoryImpl
+import com.danikarat.tally.data.repository.TransactionRepository
+import com.danikarat.tally.data.repository.TransactionRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -20,4 +22,10 @@ abstract class RepositoryModule {
     abstract fun bindAuthRepository(
         impl: AuthRepositoryImpl
     ): AuthRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindTransactionRepository(
+        impl: TransactionRepositoryImpl
+    ): TransactionRepository
 }

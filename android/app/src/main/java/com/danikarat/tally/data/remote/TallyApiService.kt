@@ -1,13 +1,17 @@
 package com.danikarat.tally.data.remote
 
 import com.danikarat.tally.data.remote.model.AuthResponse
+import com.danikarat.tally.data.remote.model.ListTransactionsResponse
 import com.danikarat.tally.data.remote.model.LoginRequest
 import com.danikarat.tally.data.remote.model.RegisterRequest
+import com.danikarat.tally.data.remote.model.SingleTransactionResponse
 import com.danikarat.tally.data.remote.model.UserResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * TallyApiService defines the Retrofit HTTP interface for the Tally Go backend API.
@@ -24,4 +28,15 @@ interface TallyApiService {
 
     @GET("auth/me")
     suspend fun getMe(): Response<UserResponse>
+
+    @GET("transactions")
+    suspend fun listTransactions(
+        @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0
+    ): Response<ListTransactionsResponse>
+
+    @GET("transactions/{id}")
+    suspend fun getTransaction(
+        @Path("id") id: String
+    ): Response<SingleTransactionResponse>
 }

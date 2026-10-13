@@ -16,6 +16,8 @@ import com.danikarat.tally.ui.screens.transactions.TransactionDetailScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.danikarat.tally.ui.screens.auth.AuthViewModel
 
+import com.danikarat.tally.ui.screens.dashboard.DashboardViewModel
+
 /**
  * TallyNavHost configures the central Jetpack Compose navigation graph.
  */
@@ -53,7 +55,9 @@ fun TallyNavHost(
         }
 
         composable(Screen.Dashboard.route) {
+            val dashboardViewModel: DashboardViewModel = hiltViewModel()
             DashboardScreen(
+                viewModel = dashboardViewModel,
                 onNavigateToTransactionDetail = { transactionId ->
                     navController.navigate(Screen.TransactionDetail.createRoute(transactionId))
                 },
