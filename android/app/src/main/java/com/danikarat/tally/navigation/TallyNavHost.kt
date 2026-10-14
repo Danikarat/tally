@@ -17,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.danikarat.tally.ui.screens.auth.AuthViewModel
 
 import com.danikarat.tally.ui.screens.dashboard.DashboardViewModel
+import com.danikarat.tally.ui.screens.onboarding.OnboardingViewModel
 
 /**
  * TallyNavHost configures the central Jetpack Compose navigation graph.
@@ -45,7 +46,9 @@ fun TallyNavHost(
         }
 
         composable(Screen.Onboarding.route) {
+            val onboardingViewModel: OnboardingViewModel = hiltViewModel()
             OnboardingScreen(
+                viewModel = onboardingViewModel,
                 onCompleteOnboarding = {
                     navController.navigate(Screen.Dashboard.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
